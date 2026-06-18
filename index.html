@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>嵐嵐廢水大抽獎 - 手搖飲品輪盤</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans HK', sans-serif;
+            background-color: #fff5f7;
+            background-image: radial-gradient(#ffb6c1 15%, transparent 16%);
+            background-size: 30px 30px;
+            overflow-x: hidden;
+            overscroll-behavior: none;
+            cursor: none; /* 隱藏原生鼠標，使用 My Melody 鼠標 */
+        }
+
+        /* 確保按鈕也沒有預設鼠標 */
+        button, a {
+            cursor: none !important;
+        }
+
+        .main-card {
+            border: 8px solid #ffffff;
+            outline: 4px dashed #ffb6c1;
+            outline-offset: -12px;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+        }
+
+        #wheelCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 10px 25px rgba(255, 105, 180, 0.2), 0 0 0 10px #fff, 0 0 0 14px #ffe4e6;
+            transition: transform 0.1s ease-out;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #FF69B4; /* My Melody 粉紅 */
+            filter: drop-shadow(0 4px 4px rgba(255, 105, 180, 0.4));
+            z-index: 10;
+        }
+
+        /* 脈衝動畫按鈕 */
+        @keyframes pulse-btn {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(255, 105, 180, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 105, 180, 0); }
+        }
+
+        .btn-spin {
+            animation: pulse-btn 2s infinite;
+            background: linear-gradient(135deg, #FF8DA1, #FF5778);
+        }
+        
+        .btn-spin:active {
+            transform: scale(0.95);
+            animation: none;
+        }
+
+        /* 隱藏/顯示動畫 */
+        .modal-enter {
+            opacity: 0;
+            transform: scale(0.9) translateY(20px);
+        }
+        .modal-enter-active {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center py-10 px-4 text-gray-800">
+
+    <!-- My Melody 可動鼠標特效 -->
+    <div id="melodyCursor" class="fixed top-0 left-0 pointer-events-none z-[100] transition-transform origin-center;">
+    <img src="https://img.icons8.com/?size=100&id=mBNVxlsY96VB&format=png&color=000000" width="48" height="48" alt="Cursor">
+    </div>
+
+    <!-- 標題區 -->
+    <header class="text-center mb-8 relative z-10">
+        <h1 class="text-4xl md:text-5xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-600 tracking-tight">
+            嵐嵐今日飲咗味？🧋
+        </h1>
+        <p class="text-lg text-rose-500 font-medium">專治選擇困難症，一鍵決定你的卡路里來源！</p>
+    </header>
+
+    <!-- 輪盤區 -->
+    <main class="main-card w-full max-w-md bg-white/95 p-6 md:p-8 rounded-[3rem] shadow-xl relative z-10">
+        <div class="wheel-container mb-8">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="800" height="800"></canvas>
+        </div>
+
+        <!-- 動態顯示正在抽的款式 -->
+        <div class="text-center h-12 mb-6 flex flex-col justify-center items-center">
+            <p id="rollingText" class="text-pink-300 text-sm font-bold tracking-widest hidden">正在為你挑選款式...</p>
+            <p id="drinkSlot" class="text-xl md:text-2xl font-bold text-rose-600"></p>
+        </div>
+
+        <!-- 按鈕 -->
+        <button id="spinBtn" class="btn-spin w-full text-white font-black text-2xl py-4 rounded-2xl shadow-lg transition-transform focus:outline-none border-b-4 border-rose-600 active:border-b-0">
+            即刻抽水！
+        </button>
+    </main>
+
+    <!-- 結果彈窗 -->
+    <div id="resultModal" class="fixed inset-0 bg-pink-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div id="modalContent" class="main-card bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl modal-enter relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-pink-300 via-pink-400 to-rose-400"></div>
+            
+            <span class="text-6xl block mb-4">🎀</span>
+            <h2 class="text-2xl font-bold text-pink-500 mb-2">天命難違，嵐嵐今日要飲：</h2>
+            
+            <div class="bg-pink-50 rounded-2xl p-6 mb-6 border-2 border-pink-100 shadow-inner">
+                <p id="resultBrand" class="text-3xl font-black text-rose-600 mb-2"></p>
+                <p id="resultDrink" class="text-xl font-bold text-pink-500 mb-4"></p>
+                <div class="inline-block bg-white px-4 py-2 rounded-full shadow-sm border border-pink-200">
+                    <p id="resultIceSugar" class="text-md font-bold text-rose-400"></p>
+                </div>
+            </div>
+            
+            <p id="funnyComment" class="text-sm text-gray-500 mb-6 font-medium italic"></p>
+            
+            <button id="closeModalBtn" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl transition-colors shadow-md">
+                接受命運 (關閉)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 🧋 廢水資料庫 (方便你隨時管理和更改) 🧋
+        const bubbleTeaData = [
+            { brand: "天仁茗茶", drinks: ["桂花金萱冰茶", "桂花烏龍奶茶", "桂花烏龍鮮奶茶", "蔓越莓果醋綠茶", "蔓越莓果醋奶綠", "蔓越莓果醋珍珠奶綠", "茉香綠茶", "胭脂紅茶", "蜂蜜綠茶", "蜂蜜紅茶", "洛神綠茶", "鐵觀音茶", "茉香奶綠", "金香奶茶", "珍珠奶綠", "珍珠奶茶", "香芋奶綠", "鐵觀音奶茶", "鮮奶綠", "鮮奶茶", "珍珠鮮奶茶", "珍珠鮮奶綠", "香芋鮮奶綠", "鐵觀音鮮奶茶", "鐵觀音朱古力鮮奶茶", "海鹽鮮奶綠", "檸檬綠茶", "檸檬紅茶", "蜂蜜檸檬綠茶","蜂蜜檸檬紅茶", "冬瓜檸檬綠茶"] },
+            { brand: "再睡5分鐘", drinks: ["棉被日安紅", "棉被午茉綠", "棉被四季金萱", "日安紅", "午茉綠", "四季金萱", "日安紅厚奶歐蕾", "午茉綠歐蕾", "深焙烏龍歐蕾", "柚紅柚綠", "芭檸年代", "凍香檸", "黑糖珍珠好濃鮮奶"] },
+            { brand: "吃茶三千", drinks: ["國王珍珠奶茶", "凍頂烏龍鮮奶茶", "玉露青檸", "水仙桂花蜜", "熔岩黑糖波霸鮮奶", "寶島經典水果茶", "青檸芬朵西", "自選"] },
+            { brand: "迷客夏", drinks: ["珍珠鮮奶茶", "伯爵紅茶拿鐵", "茉香綠茶拿鐵", "柳丁綠茶", "養樂多綠茶", "巨峰葡萄冰茶", "大甲芋頭鮮奶", "手感芋圓芋泥鮮奶", "法式草莓鮮奶", "宇治抹茶鮮奶", "珍珠手炒黑糖鮮奶"] },
+            { brand: "霸王茶姬", drinks: ["伯牙絕弦", "白霧紅塵", "萬里木蘭", "青青糯山", "花田烏龍", "桂馥蘭香", "夏夢玫瓏", "一抹山月", "醒春山", "酌紅袍", "折桂令", "花田塢", "木蘭辭", "雲中綠"] },
+            { brand: "越茶香", drinks: ["黑糖珍珠鮮奶茶", "斯⾥蘭卡奶茶", "黑糖珍珠鮮⽜乳", "桂花鮮奶大紅袍", "茉莉鮮奶茶", "桂花鮮奶大紅袍", "桂花鮮奶大紅袍", "桂花鮮奶大紅袍"] },
+            { brand: "萬波", drinks: ["金牌愛玉檸檬", "紅蘋島嶼", "草莓芝士牛奶", "白柚麗雅", "島嶼檸檬茶王", "金萱珍波粉", "珍玉冬瓜露", "波霸奶茶", "黑糖珍珠布蕾鮮奶", "大青梅果綠", "芋頭芋圓鮮奶", "楊枝甘露"] },
+            { brand: "花班茶社", drinks: ["黑糖珍珠厚鮮奶", "黑糖珍珠抹茶鮮奶", "黑糖珍珠可可鮮奶", "黑糖珍珠奶茶", "黑糖珍珠烏龍奶茶", "黑糖珍珠岩鹽厚鮮奶", "宇治抹茶鮮奶", "大甲芋頭鮮奶", "可可鮮奶", "宇治抹茶紅豆鮮奶", "薰花鮮奶綠", "烏龍鮮奶茶", "烏龍奶茶"] },
+            { brand: "龜記茗茶", drinks: ["三韻紅萱", "三十三茶王", "花沫烏龍", "碎銀普洱茶", "甘蔗檸檬四季春", "蘋果紅萱", "紅柚翡翠", "蜜桃烏龍", "三十三茶王奶茶", "碎銀普洱奶茶", "旺梨四季春", "龜記濃乳茶", "朱古力鮮乳茶", "阿源楊桃紅茶", "薑汁檸檬綠茶", "花沫烏龍奶茶"] }
+        ];
+
+        // 自動提取品牌名稱供應給輪盤使用
+        const brands = bubbleTeaData.map(item => item.brand);
+        
+        // 提取所有飲品款式用於抽獎時的滾動動畫
+        const allDrinkTypes = bubbleTeaData.flatMap(item => item.drinks);
+
+        // 🎀 My Melody 主題輪盤顏色
+        const colors = [
+            "#FFD1DC", "#FFB7C5", "#FFF5F7", "#FFFFFF", 
+            "#FFF5EE", "#FFFafa", "#FFa6c9", "#FDF5E6"
+        ];
+
+        // 獨立的冰度和甜度選項 (全隨機組合)
+        const iceLevels = ["正常冰", "少冰", "微冰", "走冰"];
+        const sugarLevels = ["全糖", "少糖", "半糖", "微糖", "無糖"];
+
+        // 隨機搞笑評語庫
+        const generalComments = [
+            "命運嘅安排，好飲與否都要接受！",
+            "打卡先啦，飲之前記得影相！",
+            "工作咁辛苦，飲杯廢水慰勞下自己啦！",
+            "減肥？聽日先算啦！",
+            "最穩陣嘅選擇，標準配備。",
+            "老闆請客就最好不過啦！"
+        ];
+
+        // --- 🎀 My Melody 可動鼠標邏輯 ---
+        const cursor = document.getElementById('melodyCursor');
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let cursorX = mouseX;
+        let cursorY = mouseY;
+        
+        // 監聽滑鼠移動
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // 隱藏離開視窗時的鼠標
+        document.addEventListener('mouseout', () => cursor.style.opacity = '0');
+        document.addEventListener('mouseover', () => cursor.style.opacity = '1');
+
+        // 平滑跟隨動畫
+        function animateCursor() {
+            // 增加一點延遲跟隨感 (0.2)
+            cursorX += (mouseX - cursorX) *0.5;
+            cursorY += (mouseY - cursorY) * 0.5;
+            
+            // 根據移動速度產生微微傾斜 (物理效果)
+            const tilt = (mouseX - cursorX) * 0.5; 
+            
+            // 偏移 -24px 是為了讓滑鼠尖端對準 Melody 圖片的中心附近
+            cursor.style.transform = `translate(${cursorX - 24}px, ${cursorY - 24}px) rotate(${tilt}deg)`;
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+        // ------------------------------------
+
+        const canvas = document.getElementById("wheelCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        // 解決高解析度螢幕模糊問題
+        const scale = window.devicePixelRatio;
+        canvas.width = 800 * scale;
+        canvas.height = 800 * scale;
+        ctx.scale(scale, scale);
+        
+        const centerX = 400;
+        const centerY = 400;
+        const radius = 380;
+        
+        const spinBtn = document.getElementById("spinBtn");
+        const drinkSlot = document.getElementById("drinkSlot");
+        const rollingText = document.getElementById("rollingText");
+        
+        const resultModal = document.getElementById("resultModal");
+        const modalContent = document.getElementById("modalContent");
+        const resultBrand = document.getElementById("resultBrand");
+        const resultDrink = document.getElementById("resultDrink");
+        const resultIceSugar = document.getElementById("resultIceSugar");
+        const funnyComment = document.getElementById("funnyComment");
+        const closeModalBtn = document.getElementById("closeModalBtn");
+        
+        const melodyImg = new Image();
+        melodyImg.src = "https://img.icons8.com/color/96/my-melody.png"; // 這裡換成您想用的圖片連結
+        melodyImg.onload = () => drawWheel(); // 圖片載入後重新繪製輪盤
+
+        let currentAngle = 0; // 當前旋轉角度
+        let isSpinning = false;
+        let slotInterval;
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, 800, 800);
+            const arcLength = (Math.PI * 2) / brands.length;
+
+            for (let i = 0; i < brands.length; i++) {
+                const angle = currentAngle + i * arcLength;
+                
+                // 畫扇形
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + arcLength, false);
+                ctx.lineTo(centerX, centerY);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                
+                // 畫邊界線 (改成白色)
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = "#ffffff";
+                ctx.stroke();
+
+                // 寫字
+                ctx.save();
+                ctx.translate(
+                    centerX + Math.cos(angle + arcLength / 2) * (radius * 0.7),
+                    centerY + Math.sin(angle + arcLength / 2) * (radius * 0.7)
+                );
+                ctx.rotate(angle + arcLength / 2 + Math.PI / 2);
+                
+                // 文字顏色改為深粉紅色
+                ctx.fillStyle = "#D81B60"; 
+                ctx.font = "bold 34px 'Noto Sans HK', sans-serif";
+                
+                // 文字直向排列 (簡單處理：分割字元並逐行畫出)
+                const text = brands[i];
+                const charHeight = 38;
+                const startY = -(text.length * charHeight) / 2;
+                
+                for(let j = 0; j < text.length; j++) {
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    // 針對英文做特別處理，避免直排奇怪
+                    if (text[j].match(/[a-zA-Z]/) && j > 0 && text[j-1].match(/[a-zA-Z]/)) {
+                         ctx.fillText(text.substring(j), 0, startY + j * charHeight);
+                         break;
+                    } else {
+                        ctx.fillText(text[j], 0, startY + j * charHeight);
+                    }
+                }
+                ctx.restore();
+            }
+
+            // 畫中心圓
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 65, 0, Math.PI * 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = "#FF69B4";
+            ctx.stroke();
+            
+            if (melodyImg.complete) {
+                // 將圖片畫在中心，位置是 (centerX-45, centerY-45)，大小為 90x90
+                ctx.drawImage(melodyImg, centerX - 45, centerY - 45, 90, 90);
+            }
+        }
+
+        function easeOutQuart(t, b, c, d) {
+            t /= d;
+            t--;
+            return -c * (t*t*t*t - 1) + b;
+        }
+
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            spinBtn.disabled = true;
+            spinBtn.classList.remove("btn-spin");
+            spinBtn.classList.add("bg-pink-300", "cursor-not-allowed");
+            spinBtn.innerText = "旋轉中...";
+            
+            rollingText.classList.remove("hidden");
+
+            // 隨機滾動款式文字 (從所有店鋪款式中隨機跳動)
+            slotInterval = setInterval(() => {
+                const randomDrink = allDrinkTypes[Math.floor(Math.random() * allDrinkTypes.length)];
+                drinkSlot.innerText = randomDrink;
+            }, 100);
+
+            // 隨機產生旋轉參數
+            const spinTimeTotal = Math.random() * 2000 + 4000; // 4到6秒
+            const startAngle = currentAngle;
+            // 至少轉 5 圈 (5 * 2PI) + 隨機額外角度
+            const targetAngle = currentAngle + (Math.PI * 2 * 5) + (Math.random() * Math.PI * 2); 
+            
+            let startTime = null;
+
+            function animate(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = timestamp - startTime;
+
+                if (progress < spinTimeTotal) {
+                    currentAngle = easeOutQuart(progress, startAngle, targetAngle - startAngle, spinTimeTotal);
+                    drawWheel();
+                    requestAnimationFrame(animate);
+                } else {
+                    currentAngle = targetAngle;
+                    drawWheel();
+                    finishSpin();
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function finishSpin() {
+            clearInterval(slotInterval);
+            isSpinning = false;
+            spinBtn.disabled = false;
+            spinBtn.classList.add("btn-spin");
+            spinBtn.classList.remove("bg-pink-300", "cursor-not-allowed");
+            spinBtn.innerText = "再抽一次！";
+            rollingText.classList.add("hidden");
+
+            // 計算結果
+            const normalizedAngle = currentAngle % (Math.PI * 2);
+            const arcLength = (Math.PI * 2) / brands.length;
+            
+            let winningIndex = Math.floor((Math.PI * 2 - (normalizedAngle + Math.PI / 2) % (Math.PI * 2)) / arcLength);
+            
+            if (winningIndex < 0) winningIndex += brands.length;
+            if (winningIndex >= brands.length) winningIndex = 0;
+
+            const finalBrand = brands[winningIndex];
+            
+            const brandData = bubbleTeaData.find(item => item.brand === finalBrand);
+            const specificDrinks = brandData.drinks;
+            
+            const finalDrink = specificDrinks[Math.floor(Math.random() * specificDrinks.length)];
+            
+            const randomIce = iceLevels[Math.floor(Math.random() * iceLevels.length)];
+            const randomSugar = sugarLevels[Math.floor(Math.random() * sugarLevels.length)];
+            
+            let modComment = "";
+            if (randomSugar === "全糖") {
+                modComment = "全糖？！螞蟻人專屬，肥死你啊！今日做多半個鐘運動啦。";
+            } else if (randomSugar === "無糖") {
+                modComment = "飲無糖？你真係當係「廢水」咁飲？佩服你最後嘅倔強！";
+            } else if (randomIce === "走冰" && randomSugar === "無糖") {
+                modComment = "走冰無糖... 施主，你不如直接飲水啦？";
+            } else {
+                modComment = generalComments[Math.floor(Math.random() * generalComments.length)];
+            }
+            
+            drinkSlot.innerText = `鎖定：${finalDrink}`;
+
+            // 更新彈窗資料
+            resultBrand.innerText = finalBrand;
+            resultDrink.innerText = finalDrink;
+            resultIceSugar.innerText = `${randomIce}、${randomSugar}`;
+            funnyComment.innerText = `"${modComment}"`;
+
+            // 顯示彈窗
+            setTimeout(showModal, 500);
+            
+            // My Melody 風格五彩碎紙效果 (粉紅、白、櫻花粉)
+            createConfetti();
+        }
+
+        function showModal() {
+            resultModal.classList.remove("hidden");
+            setTimeout(() => {
+                modalContent.classList.add("modal-enter-active");
+            }, 10);
+        }
+
+        function closeModal() {
+            modalContent.classList.remove("modal-enter-active");
+            setTimeout(() => {
+                resultModal.classList.add("hidden");
+            }, 400); // 等待動畫結束
+        }
+
+        function createConfetti() {
+            const melodyColors = ["#FFB6C1", "#FF69B4", "#FFFFFF", "#FF1493"];
+            for(let i = 0; i < 60; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.position = 'fixed';
+                confetti.style.width = '12px';
+                confetti.style.height = '12px';
+                confetti.style.backgroundColor = melodyColors[Math.floor(Math.random() * melodyColors.length)];
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.top = '-20px';
+                // 隨機變成圓形或方形 (像小花瓣)
+                confetti.style.borderRadius = Math.random() > 0.4 ? '50%' : '2px';
+                confetti.style.zIndex = '100';
+                confetti.style.pointerEvents = 'none';
+                
+                const duration = Math.random() * 3 + 2;
+                confetti.style.transition = `transform ${duration}s linear, opacity ${duration}s ease-in`;
+                
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => {
+                    confetti.style.transform = `translateY(100vh) translateX(${Math.random() * 100 - 50}px) rotate(${Math.random() * 720}deg)`;
+                    confetti.style.opacity = '0';
+                }, 10);
+                
+                setTimeout(() => {
+                    confetti.remove();
+                }, duration * 1000);
+            }
+        }
+
+        // 綁定事件
+        spinBtn.addEventListener("click", spinWheel);
+        closeModalBtn.addEventListener("click", closeModal);
+        
+        // 點擊背景關閉彈窗
+        resultModal.addEventListener("click", (e) => {
+            if(e.target === resultModal) {
+                closeModal();
+            }
+        });
+
+        // 初始化畫輪盤
+        drawWheel();
+
+        // 隨機展示幾個飲品在下方
+        drinkSlot.innerText = "點擊按鈕抽出你的命運";
+    </script>
+</body>
+</html>
