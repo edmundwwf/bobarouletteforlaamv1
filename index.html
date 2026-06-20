@@ -147,6 +147,16 @@
     </div>
 
     <script>
+        function getWeightedRandom(items, weights) {
+            let i;
+            for (i = 0; i < weights.length; i++) {
+                weights[i] += weights[i - 1] || 0;
+            }
+            let random = Math.random() * weights[weights.length - 1];
+            for (i = 0; i < weights.length; i++) {
+                if (weights[i] > random) return items[i];
+            }
+        }
         // 🧋 廢水資料庫 (方便你隨時管理和更改) 🧋
         const bubbleTeaData = [
             { brand: "天仁茗茶", drinks: ["桂花金萱冰茶", "桂花烏龍奶茶", "桂花烏龍鮮奶茶", "蔓越莓果醋綠茶", "蔓越莓果醋奶綠", "蔓越莓果醋珍珠奶綠", "茉香綠茶", "胭脂紅茶", "蜂蜜綠茶", "蜂蜜紅茶", "洛神綠茶", "鐵觀音茶", "茉香奶綠", "金香奶茶", "珍珠奶綠", "珍珠奶茶", "香芋奶綠", "鐵觀音奶茶", "鮮奶綠", "鮮奶茶", "珍珠鮮奶茶", "珍珠鮮奶綠", "香芋鮮奶綠", "鐵觀音鮮奶茶", "鐵觀音朱古力鮮奶茶", "海鹽鮮奶綠", "檸檬綠茶", "檸檬紅茶", "蜂蜜檸檬綠茶","蜂蜜檸檬紅茶", "冬瓜檸檬綠茶"] },
@@ -391,8 +401,12 @@
             
             const finalDrink = specificDrinks[Math.floor(Math.random() * specificDrinks.length)];
             
-            const randomIce = iceLevels[Math.floor(Math.random() * iceLevels.length)];
-            const randomSugar = sugarLevels[Math.floor(Math.random() * sugarLevels.length)];
+            // 新的寫法 (權重陣列順序要對應)
+            const iceWeights = [8, 2, 1, 1]; // 正常冰(8), 少冰(2), 微冰(1), 走冰(1)
+            const sugarWeights = [10, 2, 2, 1, 1]; // 全糖(10), 少糖(2), 半糖(2), 微糖(1), 無糖(1)
+
+            const randomIce = getWeightedRandom(iceLevels, iceWeights);
+            const randomSugar = getWeightedRandom(sugarLevels, sugarWeights);
             
             let modComment = "";
             if (randomSugar === "全糖") {
