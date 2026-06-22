@@ -402,8 +402,8 @@
             const finalDrink = specificDrinks[Math.floor(Math.random() * specificDrinks.length)];
             
             // 新的寫法 (權重陣列順序要對應)
-            const iceWeights = [8, 2, 1, 1]; // 正常冰(8), 少冰(2), 微冰(1), 走冰(1)
-            const sugarWeights = [10, 2, 2, 1, 1]; // 全糖(10), 少糖(2), 半糖(2), 微糖(1), 無糖(1)
+            const iceWeights = [20, 4, 1]; // 正常冰(8), 少冰(2), 走冰(1)
+            const sugarWeights = [50, 5, 3, 1, 1]; // 全糖(10), 少糖(2), 半糖(2), 微糖(1), 無糖(1)
 
             const randomIce = getWeightedRandom(iceLevels, iceWeights);
             const randomSugar = getWeightedRandom(sugarLevels, sugarWeights);
