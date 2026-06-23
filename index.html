@@ -430,17 +430,20 @@
             // 顯示彈窗
             setTimeout(showModal, 500);
             
+            // 呼叫傳送後台數據函數 (新增傳入評語 modComment)
+            sendDataToBackend(finalBrand, finalDrink, randomIce, randomSugar, modComment);
+            
             // My Melody 風格五彩碎紙效果 (粉紅、白、櫻花粉)
             createConfetti();
         }
 
             // 新增：將抽獎資料傳送到 Google Sheets 後台
-        function sendDataToBackend(brand, drink, ice, sugar) {
-            // ⚠️ 請將下方的網址替換成您剛剛在 Google Apps Script 複製的網頁應用程式網址 (Web App URL)
+        function sendDataToBackend(brand, drink, ice, sugar, comment) {
+            // ⚠️ 請將下方的網址替換成您在 Google Apps Script 複製的網頁應用程式網址 (Web App URL)
             const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxgPsrP7ogopdJHMGeZQ8ND1DpXx5PZR8sDySWyEqZCittMpR_7SS20NfUbYrJ20hWf/exec"; 
             
-            if (WEB_APP_URL === "https://script.google.com/macros/s/AKfycbxgPsrP7ogopdJHMGeZQ8ND1DpXx5PZR8sDySWyEqZCittMpR_7SS20NfUbYrJ20hWf/exec") {
-                console.log("未設定後台網址，紀錄未傳送:", { brand, drink, ice, sugar });
+            if (WEB_APP_URL === "YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
+                console.log("未設定後台網址，紀錄未傳送:", { brand, drink, ice, sugar, comment });
                 return;
             }
 
@@ -451,8 +454,9 @@
             formData.append('drink', drink);
             formData.append('ice', ice);
             formData.append('sugar', sugar);
+            formData.append('comment', comment); // 新增評語欄位傳送
 
-            // 發送 POST 請求至 Google Sheets 後台 (使用 no-cors 模式避免瀏覽器跨域阻擋)
+            // 發送 POST 請求至 Google Sheets 後台 (使用 no-cors 模式)
             fetch(WEB_APP_URL, {
                 method: "POST",
                 mode: "no-cors",
@@ -461,7 +465,6 @@
             .then(() => console.log("數據已發送至後台 Google Sheet!"))
             .catch(err => console.error("傳送數據失敗:", err));
         }
-
 
 
         
